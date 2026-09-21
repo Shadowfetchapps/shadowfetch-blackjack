@@ -7,9 +7,9 @@ NAME="shadowfetch-blackjack-${VERSION}-linux-x86_64"
 STAGE="$ROOT/export/package/$NAME"
 ARCHIVE="$ROOT/export/$NAME.tar.gz"
 
+rm -rf "$ROOT/export/package"
 "$ROOT/tools/export_linux.sh"
 "$ROOT/tools/generate-icons.sh"
-rm -rf "$STAGE"
 mkdir -p "$STAGE/export/linux" "$STAGE/tools"
 
 install -m 0755 "$ROOT/export/linux/shadowfetch-blackjack.x86_64" "$STAGE/export/linux/"
