@@ -69,11 +69,12 @@ func _right_actions(root: Control) -> void:
 	bar.add_theme_constant_override("separation", 8)
 	root.add_child(bar)
 	for pair in [
-		["deal", "DEAL"],
-		["hit", "HIT"],
-		["stand", "STAND"],
-		["double", "DOUBLE"],
-		["split", "SPLIT"],
+		["deal", "DEAL  [SPACE]"],
+		["hit", "HIT  [H]"],
+		["stand", "STAND  [S]"],
+		["double", "DOUBLE  [D]"],
+		["split", "SPLIT  [P]"],
+		["surrender", "SURRENDER  [U]"],
 		["insurance_yes", "INSURE"],
 		["insurance_no", "NO INS."],
 		["undo", "UNDO"],

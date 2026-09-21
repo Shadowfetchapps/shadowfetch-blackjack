@@ -2,7 +2,7 @@ extends Node
 
 const _Log = preload("res://scripts/engine/bj_log.gd")
 const APP_ID := "shadowfetch-blackjack"
-const SETTINGS_VERSION := 1
+const SETTINGS_VERSION := 2
 
 var resolution: Vector2i = Vector2i(1920, 1080)
 var fullscreen: bool = false
@@ -17,6 +17,8 @@ var fx_volume: float = 0.85
 var ambient_volume: float = 0.28
 var muted: bool = false
 var seen_tutorial: bool = false
+var dealer_hits_soft_17: bool = false
+var late_surrender: bool = true
 
 signal settings_changed
 
@@ -77,6 +79,8 @@ func to_dict() -> Dictionary:
 		"ambient_volume": ambient_volume,
 		"muted": muted,
 		"seen_tutorial": seen_tutorial,
+		"dealer_hits_soft_17": dealer_hits_soft_17,
+		"late_surrender": late_surrender,
 	}
 
 
@@ -93,6 +97,8 @@ func reset_defaults() -> void:
 	fx_volume = 0.85
 	ambient_volume = 0.28
 	muted = false
+	dealer_hits_soft_17 = false
+	late_surrender = true
 	seen_tutorial = seen_tutorial
 
 
@@ -117,6 +123,8 @@ func from_dict(d: Dictionary) -> void:
 	ambient_volume = clampf(float(d.get("ambient_volume", ambient_volume)), 0.0, 1.0)
 	muted = bool(d.get("muted", muted))
 	seen_tutorial = bool(d.get("seen_tutorial", seen_tutorial))
+	dealer_hits_soft_17 = bool(d.get("dealer_hits_soft_17", dealer_hits_soft_17))
+	late_surrender = bool(d.get("late_surrender", late_surrender))
 
 
 func save_settings() -> void:
@@ -200,7 +208,7 @@ func shadow_size() -> int:
 
 
 func bloom_enabled() -> bool:
-	return false
+	return quality in ["high", "ultra"]
 
 
 func anim_scale() -> float:

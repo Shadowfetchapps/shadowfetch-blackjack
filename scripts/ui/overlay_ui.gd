@@ -13,6 +13,7 @@ signal settings_changed
 
 var _root: Control
 var _pages: Dictionary = {}
+var _settings_controls: Dictionary = {}
 var current: String = ""
 var settings_return: String = "main"
 
@@ -123,17 +124,20 @@ func _make_settings() -> Control:
 	inner.add_theme_constant_override("separation", 8)
 	scroll.add_child(inner)
 	_res_row(inner)
-	_toggle(inner, "Fullscreen", SettingsStore.fullscreen, func(v): SettingsStore.fullscreen = v)
-	_toggle(inner, "VSync", SettingsStore.vsync, func(v): SettingsStore.vsync = v)
+	_toggle(inner, "Fullscreen", SettingsStore.fullscreen, func(v): SettingsStore.fullscreen = v, "fullscreen")
+	_toggle(inner, "VSync", SettingsStore.vsync, func(v): SettingsStore.vsync = v, "vsync")
 	_quality_row(inner)
 	_aa_row(inner)
-	_toggle(inner, "Shadows", SettingsStore.shadows, func(v): SettingsStore.shadows = v)
-	_slider(inner, "Animation speed", SettingsStore.animation_speed, 0.5, 2.0, func(v): SettingsStore.animation_speed = v)
-	_slider(inner, "Master", SettingsStore.master_volume, 0.0, 1.0, func(v): SettingsStore.master_volume = v)
-	_slider(inner, "Music", SettingsStore.music_volume, 0.0, 1.0, func(v): SettingsStore.music_volume = v)
-	_slider(inner, "Effects", SettingsStore.fx_volume, 0.0, 1.0, func(v): SettingsStore.fx_volume = v)
-	_slider(inner, "Ambient", SettingsStore.ambient_volume, 0.0, 1.0, func(v): SettingsStore.ambient_volume = v)
-	_toggle(inner, "Mute", SettingsStore.muted, func(v): SettingsStore.muted = v)
+	_toggle(inner, "Shadows", SettingsStore.shadows, func(v): SettingsStore.shadows = v, "shadows")
+	_slider(inner, "Animation speed", SettingsStore.animation_speed, 0.5, 2.0, func(v): SettingsStore.animation_speed = v, "animation_speed")
+	_slider(inner, "Master", SettingsStore.master_volume, 0.0, 1.0, func(v): SettingsStore.master_volume = v, "master_volume")
+	_slider(inner, "Music", SettingsStore.music_volume, 0.0, 1.0, func(v): SettingsStore.music_volume = v, "music_volume")
+	_slider(inner, "Effects", SettingsStore.fx_volume, 0.0, 1.0, func(v): SettingsStore.fx_volume = v, "fx_volume")
+	_slider(inner, "Ambient", SettingsStore.ambient_volume, 0.0, 1.0, func(v): SettingsStore.ambient_volume = v, "ambient_volume")
+	_toggle(inner, "Mute", SettingsStore.muted, func(v): SettingsStore.muted = v, "muted")
+	inner.add_child(ThemeFactory.label("TABLE RULES · apply on next deal", 14, ThemeFactory.GOLD))
+	_toggle(inner, "Dealer hits soft 17", SettingsStore.dealer_hits_soft_17, func(v): SettingsStore.dealer_hits_soft_17 = v, "dealer_hits_soft_17")
+	_toggle(inner, "Late surrender", SettingsStore.late_surrender, func(v): SettingsStore.late_surrender = v, "late_surrender")
 	var apply := ThemeFactory.button("APPLY & SAVE", 280)
 	apply.pressed.connect(func() -> void:
 		SettingsStore.apply_display()
@@ -158,7 +162,7 @@ func _res_row(parent: VBoxContainer) -> void:
 	opt.item_selected.connect(func(i): SettingsStore.resolution = opt.get_item_metadata(i))
 	row.add_child(opt)
 	parent.add_child(row)
-	parent.set_meta("res_opt", opt)
+	_settings_controls["resolution"] = opt
 
 
 func _quality_row(parent: VBoxContainer) -> void:
@@ -171,7 +175,7 @@ func _quality_row(parent: VBoxContainer) -> void:
 	opt.item_selected.connect(func(i): SettingsStore.quality = str(opt.get_item_metadata(i)))
 	row.add_child(opt)
 	parent.add_child(row)
-	parent.set_meta("qual_opt", opt)
+	_settings_controls["quality"] = opt
 
 
 func _aa_row(parent: VBoxContainer) -> void:
@@ -184,19 +188,21 @@ func _aa_row(parent: VBoxContainer) -> void:
 	opt.item_selected.connect(func(i): SettingsStore.aa = int(opt.get_item_metadata(i)))
 	row.add_child(opt)
 	parent.add_child(row)
-	parent.set_meta("aa_opt", opt)
+	_settings_controls["aa"] = opt
 
 
-func _toggle(parent: VBoxContainer, title: String, start: bool, setter: Callable) -> CheckButton:
+func _toggle(parent: VBoxContainer, title: String, start: bool, setter: Callable, key: String = "") -> CheckButton:
 	var b := CheckButton.new()
 	b.text = title
 	b.button_pressed = start
 	b.toggled.connect(func(v): setter.call(v))
 	parent.add_child(b)
+	if not key.is_empty():
+		_settings_controls[key] = b
 	return b
 
 
-func _slider(parent: VBoxContainer, title: String, start: float, lo: float, hi: float, setter: Callable) -> void:
+func _slider(parent: VBoxContainer, title: String, start: float, lo: float, hi: float, setter: Callable, key: String = "") -> void:
 	parent.add_child(ThemeFactory.label(title, 15, ThemeFactory.MUTED))
 	var s := HSlider.new()
 	s.min_value = lo
@@ -206,10 +212,29 @@ func _slider(parent: VBoxContainer, title: String, start: float, lo: float, hi: 
 	s.custom_minimum_size = Vector2(360, 24)
 	s.value_changed.connect(func(v): setter.call(v))
 	parent.add_child(s)
+	if not key.is_empty():
+		_settings_controls[key] = s
 
 
 func _sync_settings_controls() -> void:
-	pass
+	for key in ["fullscreen", "vsync", "shadows", "muted", "dealer_hits_soft_17", "late_surrender"]:
+		if _settings_controls.has(key):
+			_settings_controls[key].button_pressed = bool(SettingsStore.get(key))
+	for key in ["animation_speed", "master_volume", "music_volume", "fx_volume", "ambient_volume"]:
+		if _settings_controls.has(key):
+			_settings_controls[key].value = float(SettingsStore.get(key))
+	_select_metadata(_settings_controls.get("resolution"), SettingsStore.resolution)
+	_select_metadata(_settings_controls.get("quality"), SettingsStore.quality)
+	_select_metadata(_settings_controls.get("aa"), SettingsStore.aa)
+
+
+func _select_metadata(control: OptionButton, value: Variant) -> void:
+	if control == null:
+		return
+	for i in control.item_count:
+		if control.get_item_metadata(i) == value:
+			control.select(i)
+			return
 
 
 func _make_stats() -> Control:
@@ -288,6 +313,7 @@ Hit — take another card.
 Stand — keep your total.
 Double — double your bet, take exactly one card, then stand.
 Split — if your first two cards share a rank, play them as two hands (up to four). Doubling after a split is allowed. Split aces receive one card each.
+Surrender — on your first two cards, forfeit half your wager when late surrender is enabled.
 
 Blackjack
 An ace and a ten-value card on the first two cards pays 3 to 2, unless the dealer also has blackjack (push).
@@ -296,10 +322,10 @@ Insurance
 If the dealer shows an ace you may insure for half your bet. Insurance pays 2 to 1 if the dealer has blackjack.
 
 Dealer
-The dealer stands on every 17, including soft 17 (ace + 6).
+The default table stands on every 17, including soft 17 (ace + 6). You can enable H17 in Table Rules.
 
 Keys
-Space Deal   H Hit   S Stand   D Double   P Split   R Repeat   Esc Menu
+Space Deal   H Hit   S Stand   D Double   P Split   U Surrender   R Repeat   Esc Menu
 """
 
 

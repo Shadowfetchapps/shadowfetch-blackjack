@@ -38,6 +38,8 @@ var pushes: int = 0
 var blackjacks: int = 0
 var largest_win_cents: int = 0
 var session_profit_cents: int = 0
+var dealer_hits_soft_17: bool = false
+var late_surrender_enabled: bool = true
 
 
 func _init(seed_value: int = 0) -> void:
@@ -109,6 +111,8 @@ func legal_actions() -> PackedStringArray:
 				out.append("double")
 			if _can_split(hand):
 				out.append("split")
+			if _can_surrender(hand):
+				out.append("surrender")
 	return out
 
 
@@ -244,6 +248,18 @@ func stand() -> Dictionary:
 	return _advance_hand("stand")
 
 
+func surrender() -> Dictionary:
+	if phase != Phase.PLAYER:
+		return _reject("surrender", "not_player_turn")
+	var hand := _current_hand()
+	if hand == null or not _can_surrender(hand):
+		return _reject("surrender", "illegal")
+	hand.surrendered = true
+	hand.stood = true
+	hand.outcome = "surrender"
+	return _advance_hand("surrender")
+
+
 func double_down() -> Dictionary:
 	if phase != Phase.PLAYER:
 		return _reject("double", "not_player_turn")
@@ -305,7 +321,8 @@ func dealer_upcard() -> BJCard:
 
 
 func dealer_should_hit() -> bool:
-	return dealer.best_total() < DEALER_STANDS
+	var total := dealer.best_total()
+	return total < DEALER_STANDS or (dealer_hits_soft_17 and total == DEALER_STANDS and dealer.is_soft())
 
 
 func snapshot() -> Dictionary:
@@ -384,7 +401,7 @@ func _settle_round(dealer_bj: bool) -> void:
 				wins += 1
 				if hand.outcome == "blackjack":
 					blackjacks += 1
-			"lose", "bust":
+			"lose", "bust", "surrender":
 				losses += 1
 			"push":
 				pushes += 1
@@ -409,7 +426,10 @@ func finish_round() -> Dictionary:
 func _settle_hand(hand: BJHand, dealer_bj: bool) -> Dictionary:
 	var pay := 0
 	var out := "lose"
-	if hand.is_bust():
+	if hand.surrendered:
+		out = "surrender"
+		pay = hand.bet_cents / 2
+	elif hand.is_bust():
 		out = "bust"
 		pay = 0
 	elif hand.is_blackjack() and dealer.is_blackjack():
@@ -481,6 +501,17 @@ func _can_split(hand: BJHand) -> bool:
 	return true
 
 
+func _can_surrender(hand: BJHand) -> bool:
+	return (
+		late_surrender_enabled
+		and player_hands.size() == 1
+		and hand.cards.size() == 2
+		and not hand.from_split
+		and not hand.stood
+		and not hand.doubled
+	)
+
+
 func _current_hand() -> BJHand:
 	if active_hand < 0 or active_hand >= player_hands.size():
 		return null
@@ -499,7 +530,7 @@ func _next_unfinished() -> int:
 
 func _any_live_player() -> bool:
 	for h in player_hands:
-		if not h.is_bust():
+		if not h.is_bust() and not h.surrendered:
 			return true
 	return false
 
@@ -534,6 +565,7 @@ func _hand_dict(h: BJHand) -> Dictionary:
 		"outcome": h.outcome,
 		"blackjack": h.is_blackjack(),
 		"bust": h.is_bust(),
+		"surrendered": h.surrendered,
 	}
 
 

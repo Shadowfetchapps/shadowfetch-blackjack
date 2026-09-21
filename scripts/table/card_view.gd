@@ -4,9 +4,9 @@ extends Node3D
 const BJCard = preload("res://scripts/engine/bj_card.gd")
 const CardTextures = preload("res://scripts/table/card_textures.gd")
 
-const WIDTH := 0.118
-const HEIGHT := 0.168
-const THICK := 0.004
+const WIDTH := 0.132
+const HEIGHT := 0.188
+const THICK := 0.0045
 
 var card: BJCard
 var face_up: bool = false
@@ -28,7 +28,7 @@ func setup(p_card, textures, start_face_up: bool) -> void:
 	edge.mesh = box
 	var edge_mat := StandardMaterial3D.new()
 	edge_mat.albedo_color = Color(0.93, 0.90, 0.82)
-	edge_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	edge_mat.roughness = 0.58
 	edge.material_override = edge_mat
 	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.add_child(edge)

@@ -9,6 +9,7 @@ var doubled: bool = false
 var from_split: bool = false
 var from_split_aces: bool = false
 var stood: bool = false
+var surrendered: bool = false
 var settled: bool = false
 var outcome: String = ""
 var payout_cents: int = 0
@@ -66,7 +67,7 @@ func is_pair() -> bool:
 
 
 func is_finished() -> bool:
-	return stood or is_bust() or settled or (from_split_aces and cards.size() >= 2)
+	return stood or surrendered or is_bust() or settled or (from_split_aces and cards.size() >= 2)
 
 
 func upcard() -> BJCard:
@@ -95,6 +96,7 @@ func clear() -> void:
 	from_split = false
 	from_split_aces = false
 	stood = false
+	surrendered = false
 	settled = false
 	outcome = ""
 	payout_cents = 0

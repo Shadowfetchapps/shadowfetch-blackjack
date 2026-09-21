@@ -52,8 +52,11 @@ func _ready() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_dump_screenshot(OS.get_environment("SF_BJ_SCREENSHOT"))
-	if OS.get_environment("SF_BJ_QA") == "cards":
+	var qa_mode := OS.get_environment("SF_BJ_QA")
+	if qa_mode == "cards":
 		await _qa_card_visibility()
+	elif qa_mode == "full":
+		await _qa_full_flow()
 
 
 func _sit() -> void:
@@ -128,6 +131,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_try("double")
 		KEY_P:
 			_try("split")
+		KEY_U:
+			_try("surrender")
 		KEY_R:
 			_try("repeat")
 
@@ -165,6 +170,8 @@ func _try(action: String) -> void:
 			_do_simple(engine.double_down(), "chip_stack")
 		"split":
 			_do_split()
+		"surrender":
+			_do_simple(engine.surrender(), "button")
 		"insurance_yes":
 			_do_insurance(true)
 		"insurance_no":
@@ -189,6 +196,8 @@ func _try(action: String) -> void:
 
 
 func _do_deal() -> void:
+	engine.dealer_hits_soft_17 = SettingsStore.dealer_hits_soft_17
+	engine.late_surrender_enabled = SettingsStore.late_surrender
 	var r: Dictionary = engine.deal()
 	if not r.get("ok", false):
 		return
@@ -210,8 +219,12 @@ func _do_deal() -> void:
 func _do_simple(r: Dictionary, sound: String) -> void:
 	if not r.get("ok", false):
 		return
+	_busy = true
 	AudioManager.play(sound)
-	_sync_new_cards()
+	var added := _sync_new_cards()
+	if added > 0:
+		await _gap(0.34)
+	_busy = false
 	_after_action(r)
 
 
@@ -219,9 +232,12 @@ func _do_split() -> void:
 	var r: Dictionary = engine.split()
 	if not r.get("ok", false):
 		return
+	_busy = true
 	AudioManager.play("card")
 	table.clear_cards(true)
 	_respawn_all(false)
+	await _gap(0.34)
+	_busy = false
 	_after_action(r)
 
 
@@ -267,6 +283,8 @@ func _finish_settle() -> void:
 			AudioManager.play("bust")
 		"lose":
 			AudioManager.play("lose")
+		"surrender":
+			AudioManager.play("lose")
 		_:
 			AudioManager.play("push")
 	hud.set_status(_result_text())
@@ -280,8 +298,9 @@ func _finish_settle() -> void:
 	_refresh()
 
 
-func _sync_new_cards() -> void:
+func _sync_new_cards() -> int:
 	var existing := {}
+	var added := 0
 	for c in table._cards:
 		if c is Node and c.get("card"):
 			existing[c.card.id()] = true
@@ -292,11 +311,14 @@ func _sync_new_cards() -> void:
 			var card = hand.cards[ci]
 			if not existing.has(card.id()):
 				table.spawn_card(card, true, table.player_card_pos(hi, ci, hc), table.PLAYER_TILT, table.player_card_yaw(hi, ci, hc))
+				added += 1
 	for ci in engine.dealer.cards.size():
 		var card = engine.dealer.cards[ci]
 		if not existing.has(card.id()):
 			var up := ci > 0 or engine.phase == BlackjackEngine.Phase.SETTLE
 			table.spawn_card(card, up, table.dealer_card_pos(ci), table.DEALER_TILT, 0.0)
+			added += 1
+	return added
 
 
 func _respawn_all(reveal_hole: bool) -> void:
@@ -362,10 +384,39 @@ func _qa_card_visibility() -> void:
 	])
 	await _do_deal()
 	await _gap(0.85)
-	_dump_screenshot("/tmp/sfbj-qa/deal-faces.png")
+	_dump_screenshot(_qa_path("deal.png"))
 	if engine.can("split"):
-		_do_split()
+		await _do_split()
 		await _gap(1.05)
-		_dump_screenshot("/tmp/sfbj-qa/split-faces.png")
+		_dump_screenshot(_qa_path("split.png"))
 	await _gap(0.25)
 	get_tree().quit()
+
+
+func _qa_full_flow() -> void:
+	overlay.show_page("main")
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("main-menu.png"))
+	overlay.show_page("settings")
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("settings.png"))
+	overlay.show_page("howto")
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("how-to-play.png"))
+	overlay.show_page("stats")
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("statistics.png"))
+	overlay.show_page("pause")
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("pause.png"))
+	overlay.hide_all()
+	await get_tree().process_frame
+	_dump_screenshot(_qa_path("table.png"))
+	await _qa_card_visibility()
+
+
+func _qa_path(filename: String) -> String:
+	var root := OS.get_environment("SF_BJ_QA_OUTPUT")
+	if root.is_empty():
+		root = "/tmp/sfbj-qa"
+	return root.path_join(filename)

@@ -35,6 +35,8 @@ func run_all() -> bool:
 	_test_resplit_and_max_hands()
 	_test_insurance()
 	_test_soft_17()
+	_test_h17_option()
+	_test_late_surrender()
 	_test_dealer_hits_16()
 	_test_bankroll_bounds()
 	_test_illegal_actions()
@@ -44,7 +46,7 @@ func run_all() -> bool:
 	_test_reshuffle_conservation()
 	_test_save_load()
 	_test_corrupt_recovery()
-	_test_simulation(120000)
+	_test_simulation(200000)
 	print("\n==============================")
 	print("Shadowfetch Blackjack  —  %d passed, %d failed, %d simulated hands" % [_passed, _failed, simulated_hands])
 	for e in _errors:
@@ -298,6 +300,40 @@ func _test_soft_17() -> void:
 	_ok("player 18 beats 17", e.player_hands[0].outcome == "win")
 
 
+func _test_h17_option() -> void:
+	print("dealer H17 option")
+	var e := _e()
+	e.dealer_hits_soft_17 = true
+	_force_deal(e, "10S", "AS", "8H", "6D", ["2C"])
+	e.stand()
+	_ok("H17 dealer hits A6", e.dealer.cards.size() == 3)
+	_ok("H17 dealer reaches 19", e.dealer.best_total() == 19)
+	_ok("H17 changes outcome", e.player_hands[0].outcome == "lose")
+
+
+func _test_late_surrender() -> void:
+	print("late surrender")
+	var e := _e()
+	_force_deal(e, "10S", "9D", "6H", "7C")
+	_ok("surrender initially legal", e.can("surrender"))
+	var r := e.surrender()
+	_ok("surrender accepted", r.get("ok", false))
+	_ok("surrender settles round", e.phase == BlackjackEngine.Phase.SETTLE)
+	_ok("surrender returns half", e.player_hands[0].payout_cents == 5000)
+	_ok("surrender net half loss", e.last_net_cents == -5000)
+	_ok("surrender counts loss", e.losses == 1)
+	var e2 := _e()
+	e2.late_surrender_enabled = false
+	_force_deal(e2, "10S", "9D", "6H", "7C")
+	_ok("surrender setting honored", not e2.can("surrender"))
+	e2.hit()
+	_ok("cannot surrender after hit", not e2.surrender().get("ok", true))
+	var e3 := _e()
+	_force_deal(e3, "8S", "5D", "8H", "6C", ["3S", "2H"])
+	e3.split()
+	_ok("cannot surrender split hand", not e3.can("surrender"))
+
+
 func _test_dealer_hits_16() -> void:
 	print("dealer hits 16")
 	var e := _e()
@@ -499,6 +535,8 @@ func _test_simulation(n: int) -> void:
 					r = e.double_down()
 				"split":
 					r = e.split()
+				"surrender":
+					r = e.surrender()
 				_:
 					r = e.stand()
 			actions += 1
@@ -526,14 +564,14 @@ func _test_simulation(n: int) -> void:
 					illegal += 1
 				if str(res.get("outcome", "")) in ["lose", "bust"] and pay != 0:
 					illegal += 1
+				if str(res.get("outcome", "")) == "surrender" and pay != bet / 2:
+					illegal += 1
 			e.finish_round()
 			if e.phase != BlackjackEngine.Phase.BETTING:
 				broken_shoe += 1
-		if e.phase == BlackjackEngine.Phase.DEALER:
-			pass
 	simulated_hands = played
 	var ms := Time.get_ticks_msec() - started
-	_ok("simulated enough hands", played >= 100000, str(played))
+	_ok("simulated enough hands", played >= n, str(played))
 	_ok("no negative bankroll", negatives == 0, str(negatives))
 	_ok("shoe invariants held", broken_shoe == 0, str(broken_shoe))
 	_ok("no unexpected illegal", illegal == 0, str(illegal))

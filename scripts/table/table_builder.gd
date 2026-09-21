@@ -58,6 +58,11 @@ static func _room(parent: Node3D) -> void:
 	_box(parent, Vector3(0.12, 3.2, 6), Vector3(2.6, 1.5, 0.2), wall)
 	var drape := _mat(Color(0.12, 0.04, 0.05), 0.78)
 	_box(parent, Vector3(3.4, 2.2, 0.04), Vector3(0, 1.7, -2.12), drape)
+	var brass := _mat(Color(0.72, 0.52, 0.20), 0.26, 0.78)
+	_box(parent, Vector3(3.55, 0.025, 0.025), Vector3(0, 2.82, -2.07), brass)
+	_box(parent, Vector3(3.55, 0.025, 0.025), Vector3(0, 0.58, -2.07), brass)
+	_wall_text(parent, "SHADOWFETCH", Vector3(-0.92, 1.70, -2.045), 0.075)
+	_wall_text(parent, "BLACKJACK  ·  PRIVATE TABLE", Vector3(-0.92, 1.49, -2.04), 0.026)
 
 
 static func _table(parent: Node3D) -> void:
@@ -66,8 +71,8 @@ static func _table(parent: Node3D) -> void:
 	wood.clearcoat = 0.25
 	_box(parent, Vector3(1.72, 0.08, 1.18), Vector3(0, 0.70, -0.08), wood)
 	_box(parent, Vector3(1.78, 0.045, 1.24), Vector3(0, 0.66, -0.08), wood)
-	var felt := _mat(Color(0.10, 0.32, 0.16), 0.82)
-	felt.albedo_color = Color(0.09, 0.30, 0.15)
+	var felt := _mat(Color(0.035, 0.22, 0.105), 0.88)
+	felt.albedo_color = Color(0.035, 0.22, 0.105)
 	_box(parent, Vector3(1.60, 0.012, 1.06), Vector3(0, 0.746, -0.08), felt)
 	var rail := _mat(Color(0.12, 0.06, 0.035), 0.45, 0.08)
 	_box(parent, Vector3(1.72, 0.05, 0.06), Vector3(0, 0.775, 0.49), rail)
@@ -111,6 +116,25 @@ static func _gold_text(parent: Node3D, text: String, pos: Vector3, size: float) 
 	mi.position = pos
 	mi.rotation.x = -PI / 2.0
 	mi.material_override = _mat(Color(0.86, 0.70, 0.32), 0.32, 0.6)
+	parent.add_child(mi)
+
+
+static func _wall_text(parent: Node3D, text: String, pos: Vector3, size: float) -> void:
+	var mi := MeshInstance3D.new()
+	var tm := TextMesh.new()
+	tm.text = text
+	tm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tm.font_size = 10
+	tm.depth = 0.003
+	tm.pixel_size = size / 10.0
+	mi.mesh = tm
+	mi.position = pos
+	var mat := _mat(Color(0.86, 0.67, 0.27), 0.24, 0.72)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = Color(0.86, 0.67, 0.27)
+	mat.emission_energy_multiplier = 0.25
+	mi.material_override = mat
 	parent.add_child(mi)
 
 

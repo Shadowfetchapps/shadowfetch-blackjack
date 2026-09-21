@@ -113,7 +113,7 @@ func apply_engine(engine) -> void:
 				wins += 1
 				if str(r.get("outcome", "")) == "blackjack":
 					blackjacks += 1
-			"lose", "bust":
+			"lose", "bust", "surrender":
 				losses += 1
 			"push":
 				pushes += 1

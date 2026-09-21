@@ -7,8 +7,8 @@ const CardView = preload("res://scripts/table/card_view.gd")
 const ChipFactory = preload("res://scripts/table/chip_factory.gd")
 const TableBuilder = preload("res://scripts/table/table_builder.gd")
 const BJMoney = preload("res://scripts/engine/bj_money.gd")
-const PLAYER_TILT := 52.0
-const DEALER_TILT := 40.0
+const PLAYER_TILT := 49.0
+const DEALER_TILT := 44.0
 
 signal chip_clicked(cents: int)
 
@@ -39,14 +39,14 @@ func _build_env() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.025, 0.022, 0.02)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.28, 0.22, 0.16)
-	env.ambient_light_energy = 0.55
+	env.ambient_light_color = Color(0.22, 0.27, 0.20)
+	env.ambient_light_energy = 0.48
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.05
-	env.glow_enabled = false
-	env.glow_bloom = 0.04
-	env.glow_intensity = 0.25
-	env.glow_hdr_threshold = 1.2
+	env.glow_enabled = SettingsStore.bloom_enabled()
+	env.glow_bloom = 0.035
+	env.glow_intensity = 0.18
+	env.glow_hdr_threshold = 1.35
 	env.ssao_enabled = SettingsStore.quality in ["high", "ultra"]
 	env.ssao_radius = 0.8
 	env.ssao_intensity = 0.45
@@ -112,13 +112,13 @@ func _build_lights() -> void:
 
 func _build_camera() -> void:
 	camera = Camera3D.new()
-	camera.position = Vector3(0.0, 1.16, 1.32)
-	camera.fov = 56.0
+	camera.position = Vector3(0.0, 1.20, 1.38)
+	camera.fov = 53.0
 	camera.near = 0.04
 	camera.far = 40.0
 	camera.current = true
 	add_child(camera)
-	camera.look_at(Vector3(0.0, 0.84, 0.08))
+	camera.look_at(Vector3(0.0, 0.83, 0.02))
 	get_viewport().physics_object_picking = true
 	_idle_sway()
 
@@ -154,7 +154,7 @@ func player_card_pos(hand_index: int, card_index: int, hand_count: int) -> Vecto
 	return Vector3(
 		origin_x + float(card_index) * 0.07,
 		0.82 + float(card_index) * 0.016,
-		0.68 - float(card_index) * 0.024
+		0.58 - float(card_index) * 0.026
 	)
 
 
@@ -166,7 +166,7 @@ func player_card_yaw(hand_index: int, card_index: int, hand_count: int) -> float
 
 
 func dealer_card_pos(card_index: int) -> Vector3:
-	return Vector3(-0.08 + float(card_index) * 0.10, 0.86 + float(card_index) * 0.01, -0.20)
+	return Vector3(-0.09 + float(card_index) * 0.115, 0.86 + float(card_index) * 0.012, -0.12)
 
 
 func spawn_card(card, face_up: bool, dest: Vector3, tilt_deg: float = PLAYER_TILT, yaw_deg: float = 0.0):
