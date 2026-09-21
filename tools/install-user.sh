@@ -38,6 +38,7 @@ Categories=Game;CardGame;
 Keywords=blackjack;cards;casino;shadowfetch;
 StartupNotify=true
 StartupWMClass=Shadowfetch Blackjack
+X-AppVersion=2.0.0
 EOF
 if command -v update-desktop-database >/dev/null; then
   update-desktop-database "$PREFIX/applications" || true

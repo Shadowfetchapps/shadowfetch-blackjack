@@ -8,8 +8,8 @@
 
 - **BETTING** — chips, undo, clear, rebet, repeat, deal
 - **INSURANCE** — only if the dealer upcard is an Ace
-- **PLAYER** — hit / stand / double / split on the active hand
-- **DEALER** — draws while the best total is below 17
+- **PLAYER** — hit / stand / double / split / optional late surrender on the active hand
+- **DEALER** — draws below 17; S17 is default and H17 is configurable
 - **SETTLE** — integer-cent payouts applied; `finish_round()` discards and returns to betting
 
 ## Public API
@@ -18,7 +18,7 @@ Every mutating call returns `{ ok, action, reason?, phase }`. Illegal actions ar
 
 - `add_chip`, `undo_chip`, `clear_bet`, `rebet`, `repeat_and_deal`, `deal`
 - `take_insurance(accept)`
-- `hit`, `stand`, `double_down`, `split`
+- `hit`, `stand`, `double_down`, `split`, `surrender`
 - `legal_actions()`, `can(action)`
 - `snapshot()` for debugging
 
@@ -28,13 +28,14 @@ Every mutating call returns `{ ok, action, reason?, phase }`. Illegal actions ar
 
 ## Dealer
 
-`dealer_should_hit()` is `best_total() < 17`. Soft 17 stands. If every player hand is bust, the dealer does not draw.
+`dealer_should_hit()` is `best_total() < 17` under the default S17 rule. With H17 enabled it also hits a soft 17. If every player hand is bust or surrendered, the dealer does not draw.
 
 ## Payouts (cents)
 
 | Result | Bankroll credit |
 | --- | --- |
 | Lose / bust | 0 |
+| Late surrender | half the original bet |
 | Push | original bet |
 | Win | `2 * bet` |
 | Blackjack | `bet + bet * 3 / 2` |

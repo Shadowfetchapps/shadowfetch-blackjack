@@ -10,6 +10,9 @@
 export/linux/*.x86_64
 export/linux/*.pck
 export/linux/shadowfetch-blackjack
+export/package/
+export/*.tar.gz
+export/*.tar.gz.sha256
 export/*.debug
 build/
 .export/
@@ -24,3 +27,4 @@ tools/godot*
 user://
 app_userdata/
 *.uid
+docs/screenshots/*.import
