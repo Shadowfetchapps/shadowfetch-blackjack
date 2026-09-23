@@ -72,7 +72,7 @@ basic-strategy coach, a Hi-Lo counting trainer, statistics, hand history and ach
 ## Install
 
 Download `shadowfetch-blackjack-3.0.0-linux-x86_64.tar.gz` from the
-[latest release](https://github.com/ShadowfetchLinux/shadowfetch-blackjack/releases/latest), then:
+[latest release](https://github.com/Shadowfetchapps/shadowfetch-blackjack/releases/latest), then:
 
 ```bash
 tar -xzf shadowfetch-blackjack-3.0.0-linux-x86_64.tar.gz
