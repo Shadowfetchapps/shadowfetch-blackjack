@@ -15,6 +15,8 @@ mkdir -p "$STAGE/export/linux" "$STAGE/tools"
 install -m 0755 "$ROOT/export/linux/shadowfetch-blackjack.x86_64" "$STAGE/export/linux/"
 install -m 0755 "$ROOT/tools/install-user.sh" "$ROOT/tools/uninstall-user.sh" "$ROOT/tools/generate-icons.sh" "$STAGE/tools/"
 cp -a "$ROOT/data" "$STAGE/"
+find "$STAGE/data" -name '*.import' -delete
+echo "$VERSION" > "$STAGE/VERSION"
 install -m 0644 "$ROOT/icon.svg" "$ROOT/LICENSE" "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$STAGE/"
 
 tar -C "$ROOT/export/package" -czf "$ARCHIVE" "$NAME"

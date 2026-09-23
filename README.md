@@ -9,6 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Shadowfetchapps/shadowfetch-blackjack/actions/workflows/ci.yml"><img src="https://github.com/Shadowfetchapps/shadowfetch-blackjack/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Shadowfetchapps/shadowfetch-blackjack/releases/latest"><img src="https://img.shields.io/github/v/release/Shadowfetchapps/shadowfetch-blackjack" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20x86__64-informational" alt="Linux x86_64">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/main-menu.png" alt="Main menu over the private card room" width="880">
 </p>
 
@@ -16,11 +23,11 @@ Take a seat at a private card room table: a padded semicircular table whose felt
 rules, a lamp-lit room, original art-deco cards and clay chips, a dealer that peeks, flips and sweeps, and chips that
 are paid and collected by hand. Underneath is a rules engine with configurable house rules, side bets, a
 basic-strategy coach, a Hi-Lo counting trainer, statistics, hand history and achievements — all backed by
-400+ assertions and a 200,000-hand simulation.
+406 assertions, a 200,000-hand simulation and a 1,000,000-hand strategy check.
 
 **Everything is fictional.** There is no cash-out, no deposits and no real-money gambling.
 
-**Version 3.0.0** · [Changelog](CHANGELOG.md) · [Architecture](ARCHITECTURE.md) · [Docs](docs/)
+**Version 3.0.1** · [Changelog](CHANGELOG.md) · [Architecture](ARCHITECTURE.md) · [Docs](docs/)
 
 | Deal with side bets | Split, doubled card, coach |
 | --- | --- |
@@ -58,7 +65,7 @@ basic-strategy coach, a Hi-Lo counting trainer, statistics, hand history and ach
 
 **The sound**
 - An original synthesized score (a lounge-jazz loop at the table, a nocturne in the menus), room ambience and
-  30 synthesized effects: card slides, flips and taps, clay chip clacks, a riffle shuffle, payouts and results.
+  26 synthesized effects: card slides, flips and taps, clay chip clacks, a riffle shuffle, payouts and results.
 
 ## Screenshots
 
@@ -71,12 +78,13 @@ basic-strategy coach, a Hi-Lo counting trainer, statistics, hand history and ach
 
 ## Install
 
-Download `shadowfetch-blackjack-3.0.0-linux-x86_64.tar.gz` from the
+Download `shadowfetch-blackjack-3.0.1-linux-x86_64.tar.gz` from the
 [latest release](https://github.com/Shadowfetchapps/shadowfetch-blackjack/releases/latest), then:
 
 ```bash
-tar -xzf shadowfetch-blackjack-3.0.0-linux-x86_64.tar.gz
-cd shadowfetch-blackjack-3.0.0-linux-x86_64
+sha256sum -c shadowfetch-blackjack-3.0.1-linux-x86_64.tar.gz.sha256   # optional
+tar -xzf shadowfetch-blackjack-3.0.1-linux-x86_64.tar.gz
+cd shadowfetch-blackjack-3.0.1-linux-x86_64
 ./tools/install-user.sh
 ```
 
@@ -89,7 +97,8 @@ This installs, for the current user only:
 Launch **Shadowfetch Blackjack** from your application menu, or run `shadowfetch-blackjack`.
 Remove it with `./tools/uninstall-user.sh` (settings, statistics and achievements are kept).
 
-Requirements: Linux x86_64 and a Vulkan-capable GPU.
+Requirements: Linux x86_64 and a Vulkan-capable GPU. Installing needs no root and no extra packages.
+Upgrading from 1.x or 2.x keeps your bankroll, statistics and settings — they migrate automatically on first launch.
 
 ## How to play
 
@@ -144,6 +153,8 @@ python3 tools/side_bet_edges.py   # exact side-bet house edges
 ```
 
 ## Documentation
+
+Start at the [documentation index](docs/README.md). Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | | |
 | --- | --- |

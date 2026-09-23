@@ -15,7 +15,15 @@ install -m 0755 "$BIN_SRC" "$BINDIR/shadowfetch-blackjack"
 if [[ -f "$ROOT/export/linux/shadowfetch-blackjack.pck" ]]; then
   install -m 0644 "$ROOT/export/linux/shadowfetch-blackjack.pck" "$BINDIR/shadowfetch-blackjack.pck"
 fi
-"$ROOT/tools/generate-icons.sh"
+# Release tarballs ship the PNG icons; only rebuild them (needs rsvg-convert) when missing.
+if [[ ! -f "$ROOT/data/icons/hicolor/256x256/apps/${ICON_NAME}.png" ]]; then
+  "$ROOT/tools/generate-icons.sh"
+fi
+if [[ -f "$ROOT/VERSION" ]]; then
+  VERSION="$(<"$ROOT/VERSION")"
+else
+  VERSION="$(grep -Po '(?<=config/version=")[^"]+' "$ROOT/project.godot")"
+fi
 for size in 16 22 24 32 48 64 96 128 256 512 1024; do
   dest="$PREFIX/icons/hicolor/${size}x${size}/apps"
   mkdir -p "$dest"
@@ -38,7 +46,7 @@ Categories=Game;CardGame;
 Keywords=blackjack;cards;casino;shadowfetch;
 StartupNotify=true
 StartupWMClass=Shadowfetch Blackjack
-X-AppVersion=3.0.0
+X-AppVersion=${VERSION}
 EOF
 if command -v update-desktop-database >/dev/null; then
   update-desktop-database "$PREFIX/applications" || true
@@ -50,5 +58,5 @@ if command -v desktop-file-validate >/dev/null; then
   desktop-file-validate "$PREFIX/applications/${APP_ID}.desktop"
 fi
 test -x "$BINDIR/shadowfetch-blackjack"
-echo "Installed $BINDIR/shadowfetch-blackjack"
+echo "Installed Shadowfetch Blackjack ${VERSION} to $BINDIR/shadowfetch-blackjack"
 echo "Desktop: $PREFIX/applications/${APP_ID}.desktop"

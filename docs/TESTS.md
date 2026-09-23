@@ -7,7 +7,9 @@ SF_BJ_SMOKE=0 ./tools/run_tests.sh         # skip the game-scene smoke test
 ```
 
 The runner refreshes Godot's import/class cache, runs the headless suites in `tests/`, then boots the real game
-headless for a smoke test. Saves go to a scratch folder via `SHADOWFETCH_BJ_HOME`.
+headless for a smoke test. Saves go to a scratch folder via `SHADOWFETCH_BJ_HOME`. A current run reports
+**406 passed, 0 failed, 200,002 simulated hands** in about a minute on a desktop CPU. A suite that fails to compile is
+reported as a failure, and the unit step has a hard timeout, so a broken build can never hang CI.
 
 ## Suites
 
