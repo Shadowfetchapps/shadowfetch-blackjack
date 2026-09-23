@@ -1,30 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1a1610"/>
-      <stop offset="0.45" stop-color="#0b0a08"/>
-      <stop offset="1" stop-color="#050403"/>
+      <stop offset="0" stop-color="#11402E"/>
+      <stop offset="0.55" stop-color="#0A2219"/>
+      <stop offset="1" stop-color="#050B08"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f8e7b0"/>
-      <stop offset="0.45" stop-color="#d4af37"/>
-      <stop offset="1" stop-color="#8a6a1d"/>
-    </linearGradient>
-    <linearGradient id="goldHi" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#fff6d2"/>
-      <stop offset="1" stop-color="#c9a227"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="38%" cy="32%" r="55%">
-      <stop offset="0" stop-color="#d4af37" stop-opacity="0.28"/>
-      <stop offset="1" stop-color="#0b0a08" stop-opacity="0"/>
+    <radialGradient id="glow" cx="256" cy="244" r="230" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B6B4A" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0A2219" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="well" cx="236" cy="226" r="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#124A34"/>
+      <stop offset="1" stop-color="#061510"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="96" y1="80" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8E7B0"/>
+      <stop offset="0.38" stop-color="#D4AF37"/>
+      <stop offset="0.7" stop-color="#B08A2A"/>
+      <stop offset="1" stop-color="#7C5E18"/>
+    </linearGradient>
+    <linearGradient id="spade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#FFF8E6"/>
+      <stop offset="0.6" stop-color="#F3E3B8"/>
+      <stop offset="1" stop-color="#D9BC6C"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6E4A6" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#D4AF37" stop-opacity="0.15"/>
+    </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="118" fill="url(#plate)"/>
-  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
-  <circle cx="256" cy="256" r="214" fill="none" stroke="url(#gold)" stroke-width="18"/>
-  <circle cx="256" cy="256" r="188" fill="none" stroke="#d4af37" stroke-opacity="0.28" stroke-width="3"/>
-  <circle cx="256" cy="256" r="168" fill="none" stroke="url(#gold)" stroke-width="10" stroke-dasharray="18 14"/>
-  <path fill="url(#goldHi)" d="M168 150c42-8 78 10 92 42 8-18 28-34 58-38 46-6 86 28 90 78 4 58-32 100-86 112-18 4-30 8-34 22v46h-48v-52c0-28 16-44 44-52 36-10 56-34 54-66-2-28-24-46-54-44-28 2-46 22-50 48h-48c6-58 40-90 82-96z"/>
-  <path fill="#0b0a08" d="M332 348c18 6 28 22 18 40-12 22-48 28-78 10l8-18c18 10 36 8 42-2 4-8-2-14-14-16z"/>
-  <path fill="url(#gold)" d="M118 378l22-36 18 10c8-8 22-20 28-14 4 4-2 16-8 28l20 12-22 36-20-12c-6 10-18 26-26 20-6-4 2-18 10-30z"/>
+  <rect width="512" height="512" rx="112" fill="url(#plate)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <rect x="10" y="10" width="492" height="492" rx="102" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="256" cy="256" r="155" fill="url(#well)"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="url(#gold)" stroke-width="42"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(22.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(67.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(112.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(157.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(202.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(247.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(292.5 256 256)"/>
+  <rect x="410.5" y="239" width="43" height="34" fill="#F6EEDA" transform="rotate(337.5 256 256)"/>
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#5E4712" stroke-opacity="0.55" stroke-width="2"/>
+  <circle cx="256" cy="256" r="156" fill="none" stroke="#5E4712" stroke-opacity="0.55" stroke-width="2"/>
+  <circle cx="256" cy="256" r="136" fill="none" stroke="url(#gold)" stroke-width="5"/>
+  <path d="M 260 162 C 274.98 196.24 371.28 224.06 371.28 277.56 C 371.28 311.8 349.88 331.06 320.99 331.06 C 294.24 331.06 274.98 318.22 266.85 301.1 C 269.84 333.2 283.54 363.16 304.94 376 C 277.12 370.65 242.88 370.65 215.06 376 C 236.46 363.16 250.16 333.2 253.15 301.1 C 245.02 318.22 225.76 331.06 199.01 331.06 C 170.12 331.06 148.72 311.8 148.72 277.56 C 148.72 224.06 245.02 196.24 260 162 Z" fill="#020605" fill-opacity="0.45"/>
+  <path d="M 256 155 C 270.98 189.24 367.28 217.06 367.28 270.56 C 367.28 304.8 345.88 324.06 316.99 324.06 C 290.24 324.06 270.98 311.22 262.85 294.1 C 265.84 326.2 279.54 356.16 300.94 369 C 273.12 363.65 238.88 363.65 211.06 369 C 232.46 356.16 246.16 326.2 249.15 294.1 C 241.02 311.22 221.76 324.06 195.01 324.06 C 166.12 324.06 144.72 304.8 144.72 270.56 C 144.72 217.06 241.02 189.24 256 155 Z" fill="url(#spade)"/>
 </svg>

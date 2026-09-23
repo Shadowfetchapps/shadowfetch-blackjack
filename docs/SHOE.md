@@ -1,23 +1,32 @@
 # Shoe
 
-`BJShoe` models a **six-deck** shoe (312 unique cards). Each card id is `deck-suit-rank`.
+`BJShoe` models an n-deck shoe (1, 2, 4, 6 or 8 decks; 52 × n cards). Each card carries an integer
+`uid = deck × 52 + suit × 13 + (rank − 1)` so bookkeeping is O(1).
 
-## Shuffle
+## Shuffle and cut card
 
-Fisher–Yates using `RandomNumberGenerator`. Tests may pass a seed to `BlackjackEngine.new(seed)`.
-
-## Cut card
-
-After a shuffle the cut index is placed 60–78 cards from the end. When draws reach that index, `cut_reached` is set. The current hand finishes; the next `deal()` reshuffles if the cut was reached or fewer than 30 cards remain.
+A full shuffle is Fisher–Yates over all cards using `RandomNumberGenerator` (seedable for tests). The cut card is
+placed at `penetration × capacity ± 6` cards (clamped to at least half the shoe and at least 12 from the end).
+When the draw count reaches it, `cut_reached` is set; the current round finishes and the next `deal()` reshuffles.
+A new round is also never started with fewer than 20 cards left.
 
 ## Conservation
 
-At every moment:
+Every card is always in exactly one place: the live draw stack, the discard tray, or in play on the table.
 
 ```
-remaining + discarded + in_play == 312
+remaining + discarded + in_play == capacity      and every uid appears exactly once
 ```
 
-and every id appears exactly once. `unique_ok()` checks both.
+`unique_ok()` verifies both in O(n) with a byte map. The simulation checks it after every one of 200,000 rounds.
 
-`force_next(cards)` is test-only: it pulls matching cards to the top of the draw stack so edge cases can be scripted.
+## Mid-round exhaustion
+
+If the live stack runs dry during a round (possible with one deck and many splits), only the **discard tray** is
+shuffled back in — the cards on the table stay put — and a full reshuffle is forced before the next round.
+
+## Signals and helpers
+
+- `reshuffled(full)` — the engine resets the Hi-Lo count and the controller plays the shuffle presentation.
+- `dealt_fraction()` / `cut_fraction()` drive the HUD shoe gauge; `decks_remaining()` feeds the true count.
+- `force_next(cards)` (tests and QA only) moves specific cards to the top of the draw stack.

@@ -1,57 +1,70 @@
 extends Node
+## Autoload `SettingsStore`: display, audio, gameplay, appearance, accessibility and
+## table-rule preferences. Schema v3; v1/v2 files migrate automatically.
 
 const _Log = preload("res://scripts/engine/bj_log.gd")
-const APP_ID := "shadowfetch-blackjack"
-const SETTINGS_VERSION := 2
+const _Paths = preload("res://scripts/save/paths.gd")
+const _Rules = preload("res://scripts/engine/bj_rules.gd")
 
+const SETTINGS_VERSION := 3
+const QUALITIES: PackedStringArray = ["low", "medium", "high", "ultra"]
+const COACH_MODES: PackedStringArray = ["off", "hints", "coach"]
+const CAMERA_MODES: PackedStringArray = ["seated", "overhead"]
+const FELT_COLORS: PackedStringArray = ["emerald", "midnight", "crimson", "charcoal"]
+const CARD_BACKS: PackedStringArray = ["emerald", "onyx", "crimson", "sapphire"]
+const RESOLUTIONS: Array[Vector2i] = [
+	Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)
+]
+
+signal settings_changed
+signal appearance_changed
+signal rules_changed
+
+# Display
 var resolution: Vector2i = Vector2i(1920, 1080)
 var fullscreen: bool = false
 var vsync: bool = true
 var quality: String = "high"
 var aa: int = 4
 var shadows: bool = true
-var animation_speed: float = 1.0
+# Audio
 var master_volume: float = 0.80
-var music_volume: float = 0.22
+var music_volume: float = 0.35
 var fx_volume: float = 0.85
-var ambient_volume: float = 0.28
+var ambient_volume: float = 0.30
 var muted: bool = false
+# Gameplay
+var animation_speed: float = 1.0
+var coach_mode: String = "hints"
+var show_count: bool = false
+var show_totals: bool = true
 var seen_tutorial: bool = false
-var dealer_hits_soft_17: bool = false
-var late_surrender: bool = true
-
-signal settings_changed
+# Appearance
+var camera_mode: String = "seated"
+var felt_color: String = "emerald"
+var card_back: String = "emerald"
+var four_color: bool = false
+# Accessibility
+var ui_scale: float = 1.0
+var reduced_motion: bool = false
+var camera_sway: bool = true
+# Table
+var rules: _Rules = _Rules.new()
 
 
 func _ready() -> void:
 	load_settings()
-	if not _is_headless():
+	if not _Paths.is_headless():
 		apply_display()
 		apply_audio()
 
 
-func _sandbox() -> String:
-	return OS.get_environment("SHADOWFETCH_BJ_HOME")
-
-
 func config_dir() -> String:
-	var box := _sandbox()
-	if not box.is_empty():
-		return box.path_join("config")
-	var xdg := OS.get_environment("XDG_CONFIG_HOME")
-	if xdg.is_empty():
-		xdg = OS.get_environment("HOME").path_join(".config")
-	return xdg.path_join(APP_ID)
+	return _Paths.config_dir()
 
 
 func data_dir() -> String:
-	var box := _sandbox()
-	if not box.is_empty():
-		return box.path_join("data")
-	var xdg := OS.get_environment("XDG_DATA_HOME")
-	if xdg.is_empty():
-		xdg = OS.get_environment("HOME").path_join(".local/share")
-	return xdg.path_join(APP_ID)
+	return _Paths.data_dir()
 
 
 func settings_path() -> String:
@@ -72,36 +85,56 @@ func to_dict() -> Dictionary:
 		"quality": quality,
 		"aa": aa,
 		"shadows": shadows,
-		"animation_speed": animation_speed,
 		"master_volume": master_volume,
 		"music_volume": music_volume,
 		"fx_volume": fx_volume,
 		"ambient_volume": ambient_volume,
 		"muted": muted,
+		"animation_speed": animation_speed,
+		"coach_mode": coach_mode,
+		"show_count": show_count,
+		"show_totals": show_totals,
 		"seen_tutorial": seen_tutorial,
-		"dealer_hits_soft_17": dealer_hits_soft_17,
-		"late_surrender": late_surrender,
+		"camera_mode": camera_mode,
+		"felt_color": felt_color,
+		"card_back": card_back,
+		"four_color": four_color,
+		"ui_scale": ui_scale,
+		"reduced_motion": reduced_motion,
+		"camera_sway": camera_sway,
+		"rules": rules.to_dict(),
 	}
 
 
-func reset_defaults() -> void:
+func reset_defaults(keep_tutorial: bool = true) -> void:
+	var seen := seen_tutorial
 	resolution = Vector2i(1920, 1080)
 	fullscreen = false
 	vsync = true
 	quality = "high"
 	aa = 4
 	shadows = true
-	animation_speed = 1.0
 	master_volume = 0.80
-	music_volume = 0.22
+	music_volume = 0.35
 	fx_volume = 0.85
-	ambient_volume = 0.28
+	ambient_volume = 0.30
 	muted = false
-	dealer_hits_soft_17 = false
-	late_surrender = true
-	seen_tutorial = seen_tutorial
+	animation_speed = 1.0
+	coach_mode = "hints"
+	show_count = false
+	show_totals = true
+	camera_mode = "seated"
+	felt_color = "emerald"
+	card_back = "emerald"
+	four_color = false
+	ui_scale = 1.0
+	reduced_motion = false
+	camera_sway = true
+	rules = _Rules.new()
+	seen_tutorial = seen if keep_tutorial else false
 
 
+## Loads validated values. Unknown or out-of-range values keep their defaults.
 func from_dict(d: Dictionary) -> void:
 	var res: Variant = d.get("resolution", [resolution.x, resolution.y])
 	if res is Array and res.size() >= 2:
@@ -111,62 +144,90 @@ func from_dict(d: Dictionary) -> void:
 			resolution = Vector2i(rx, ry)
 	fullscreen = bool(d.get("fullscreen", fullscreen))
 	vsync = bool(d.get("vsync", vsync))
-	var q := str(d.get("quality", quality)).to_lower()
-	if q in ["low", "medium", "high", "ultra"]:
-		quality = q
-	aa = clampi(int(d.get("aa", aa)), 0, 8)
+	quality = _pick(str(d.get("quality", quality)).to_lower(), QUALITIES, quality)
+	var aa_v := int(d.get("aa", aa))
+	aa = aa_v if aa_v in [0, 2, 4, 8] else aa
 	shadows = bool(d.get("shadows", shadows))
-	animation_speed = clampf(float(d.get("animation_speed", animation_speed)), 0.35, 2.5)
-	master_volume = clampf(float(d.get("master_volume", master_volume)), 0.0, 1.0)
-	music_volume = clampf(float(d.get("music_volume", music_volume)), 0.0, 1.0)
-	fx_volume = clampf(float(d.get("fx_volume", fx_volume)), 0.0, 1.0)
-	ambient_volume = clampf(float(d.get("ambient_volume", ambient_volume)), 0.0, 1.0)
+	master_volume = _unit(d.get("master_volume", master_volume))
+	music_volume = _unit(d.get("music_volume", music_volume))
+	fx_volume = _unit(d.get("fx_volume", fx_volume))
+	ambient_volume = _unit(d.get("ambient_volume", ambient_volume))
 	muted = bool(d.get("muted", muted))
+	animation_speed = clampf(float(d.get("animation_speed", animation_speed)), 0.5, 2.5)
+	coach_mode = _pick(str(d.get("coach_mode", coach_mode)), COACH_MODES, coach_mode)
+	show_count = bool(d.get("show_count", show_count))
+	show_totals = bool(d.get("show_totals", show_totals))
 	seen_tutorial = bool(d.get("seen_tutorial", seen_tutorial))
-	dealer_hits_soft_17 = bool(d.get("dealer_hits_soft_17", dealer_hits_soft_17))
-	late_surrender = bool(d.get("late_surrender", late_surrender))
+	camera_mode = _pick(str(d.get("camera_mode", camera_mode)), CAMERA_MODES, camera_mode)
+	felt_color = _pick(str(d.get("felt_color", felt_color)), FELT_COLORS, felt_color)
+	card_back = _pick(str(d.get("card_back", card_back)), CARD_BACKS, card_back)
+	four_color = bool(d.get("four_color", four_color))
+	ui_scale = clampf(float(d.get("ui_scale", ui_scale)), 0.8, 1.5)
+	reduced_motion = bool(d.get("reduced_motion", reduced_motion))
+	camera_sway = bool(d.get("camera_sway", camera_sway))
+	# v1/v2 kept two table rules at the top level.
+	if d.has("dealer_hits_soft_17"):
+		rules.dealer_hits_soft_17 = bool(d["dealer_hits_soft_17"])
+	if d.has("late_surrender"):
+		rules.late_surrender = bool(d["late_surrender"])
+	var r: Variant = d.get("rules", null)
+	if r is Dictionary:
+		rules.from_dict(r)
 
 
 func save_settings() -> void:
-	ensure_dirs()
-	var f := FileAccess.open(settings_path(), FileAccess.WRITE)
-	if f == null:
+	if not _Paths.write_json(settings_path(), to_dict()):
 		_Log.warn("Could not write settings")
-		return
-	f.store_string(JSON.stringify(to_dict(), "\t"))
 	settings_changed.emit()
 
 
 func load_settings() -> void:
-	var path := settings_path()
-	if not FileAccess.file_exists(path):
+	var parsed: Variant = _Paths.read_json(settings_path())
+	if parsed == null:
 		return
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		_Log.warn("Could not read settings; using defaults")
-		return
-	var text := f.get_as_text()
-	var parsed: Variant = JSON.parse_string(text)
-	if parsed is Dictionary:
+	if parsed is Dictionary and not parsed.has("__corrupt"):
 		from_dict(parsed)
+		if int(parsed.get("version", 1)) < SETTINGS_VERSION:
+			_Log.info("Migrated settings.json to v%d" % SETTINGS_VERSION)
+			save_settings()
 	else:
-		_Log.warn("Corrupt settings.json — restoring defaults")
+		_Log.warn("Corrupt settings.json (kept as settings.json.corrupt) — restoring defaults")
 		reset_defaults()
 		save_settings()
 
 
+func set_rules(r: _Rules) -> void:
+	rules = r.duplicate_rules()
+	save_settings()
+	rules_changed.emit()
+
+
+func notify_appearance() -> void:
+	save_settings()
+	appearance_changed.emit()
+
+
 func apply_display() -> void:
-	if _is_headless():
+	if _Paths.is_headless():
 		return
 	Engine.max_fps = 0
-	DisplayServer.window_set_vsync_mode(
-		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED
-	)
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	var mode := DisplayServer.window_get_mode()
 	if fullscreen:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		if mode != DisplayServer.WINDOW_MODE_FULLSCREEN and mode != DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-		DisplayServer.window_set_size(resolution)
+		if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
+			var screen := DisplayServer.screen_get_usable_rect()
+			var size := resolution
+			if screen.size.x > 0:
+				size = Vector2i(mini(size.x, screen.size.x), mini(size.y, screen.size.y))
+			if DisplayServer.window_get_size() != size:
+				DisplayServer.window_set_size(size)
+				if screen.size.x > 0:
+					DisplayServer.window_set_position(screen.position + (screen.size - size) / 2)
 	var vp := get_viewport()
 	if vp == null:
 		return
@@ -179,11 +240,11 @@ func apply_display() -> void:
 			vp.msaa_3d = Viewport.MSAA_2X
 		_:
 			vp.msaa_3d = Viewport.MSAA_DISABLED
-	# TAA / FXAA smear Control HUD text. Keep 3D AA on MSAA only.
+	# TAA / FXAA smear HUD text; 3D anti-aliasing stays on MSAA.
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.use_taa = false
-	if quality == "ultra" and aa == 0:
-		vp.msaa_3d = Viewport.MSAA_8X
+	vp.anisotropic_filtering_level = Viewport.ANISOTROPY_16X if quality in ["high", "ultra"] else Viewport.ANISOTROPY_4X
+	get_tree().root.content_scale_factor = ui_scale
 
 
 func apply_audio() -> void:
@@ -208,11 +269,15 @@ func shadow_size() -> int:
 
 
 func bloom_enabled() -> bool:
-	return quality in ["high", "ultra"]
+	return quality != "low"
 
 
 func anim_scale() -> float:
 	return 1.0 / maxf(animation_speed, 0.35)
+
+
+func motion_enabled() -> bool:
+	return not reduced_motion
 
 
 func _set_bus(name: String, linear: float, mute: bool) -> void:
@@ -223,5 +288,11 @@ func _set_bus(name: String, linear: float, mute: bool) -> void:
 	AudioServer.set_bus_mute(idx, mute or linear <= 0.001)
 
 
-func _is_headless() -> bool:
-	return DisplayServer.get_name() == "headless" or OS.has_feature("headless")
+func _pick(value: String, allowed: PackedStringArray, fallback: String) -> String:
+	return value if allowed.has(value) else fallback
+
+
+func _unit(v: Variant) -> float:
+	if v is float or v is int:
+		return clampf(float(v), 0.0, 1.0)
+	return 0.5

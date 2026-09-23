@@ -1,339 +1,389 @@
 class_name OverlayUI
 extends CanvasLayer
+## Full-screen menus with a navigation stack: main menu, pause, settings, table rules,
+## strategy chart, statistics, history, achievements, how-to-play and dialogs.
 
 const ThemeFactory = preload("res://scripts/ui/theme_factory.gd")
 const BJMoney = preload("res://scripts/engine/bj_money.gd")
+const SettingsPage = preload("res://scripts/ui/pages/settings_page.gd")
+const RulesPage = preload("res://scripts/ui/pages/rules_page.gd")
+const StatsPage = preload("res://scripts/ui/pages/stats_page.gd")
+const HistoryPage = preload("res://scripts/ui/pages/history_page.gd")
+const AchievementsPage = preload("res://scripts/ui/pages/achievements_page.gd")
+const ChartPage = preload("res://scripts/ui/pages/chart_page.gd")
 
 signal play
 signal resume
 signal restart_session
 signal main_menu
 signal quit_game
+signal rebuy
 signal settings_changed
+signal appearance_changed
+signal replay_tutorial
+signal page_changed(name: String)
 
 var _root: Control
+var _dim: ColorRect
 var _pages: Dictionary = {}
-var _settings_controls: Dictionary = {}
+var _stack: Array[String] = []
 var current: String = ""
-var settings_return: String = "main"
+var engine
+var _play_button: Button
+var _menu_bankroll: Label
 
 
 func build() -> void:
 	layer = 20
 	_root = Control.new()
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.theme = ThemeFactory.theme()
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
-	_pages["main"] = _make_main()
-	_pages["pause"] = _make_pause()
-	_pages["settings"] = _make_settings()
-	_pages["stats"] = _make_stats()
-	_pages["howto"] = _make_howto()
-	_pages["tutorial"] = _make_tutorial()
-	for k in _pages:
-		_root.add_child(_pages[k])
-		_pages[k].visible = false
+	_dim = ColorRect.new()
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_dim.color = Color(0, 0, 0, 0.55)
+	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_dim.visible = false
+	_root.add_child(_dim)
+	_add_page("main", _make_main())
+	_add_page("pause", _make_pause())
+	_add_page("howto", _make_howto())
+	_add_page("broke", _make_broke())
+	var settings := SettingsPage.new()
+	settings.build(self)
+	_add_page("settings", settings)
+	var rules := RulesPage.new()
+	rules.build(self)
+	_add_page("rules", rules)
+	var stats := StatsPage.new()
+	stats.build(self)
+	_add_page("stats", stats)
+	var history := HistoryPage.new()
+	history.build(self)
+	_add_page("history", history)
+	var ach := AchievementsPage.new()
+	ach.build(self)
+	_add_page("achievements", ach)
+	var chart := ChartPage.new()
+	chart.build(self)
+	_add_page("chart", chart)
 	hide_all()
 
 
-func hide_all() -> void:
-	_root.visible = false
-	current = ""
-	for k in _pages:
-		_pages[k].visible = false
+func _add_page(name: String, page: Control) -> void:
+	page.visible = false
+	_root.add_child(page)
+	_pages[name] = page
 
 
-func show_page(name: String) -> void:
-	_root.visible = true
-	if name == "settings" and current != "" and current != "settings":
-		settings_return = current
-	current = name
-	for k in _pages:
-		_pages[k].visible = k == name
-	if name == "stats":
-		_refresh_stats()
-	if name == "settings":
-		_sync_settings_controls()
-
+# --- navigation -------------------------------------------------------------
 
 func visible_page() -> bool:
-	return _root.visible
+	return not current.is_empty()
 
 
-func _screen(title: String) -> Control:
+func show_page(name: String, push: bool = true) -> void:
+	if not _pages.has(name):
+		return
+	if push and not current.is_empty() and current != name:
+		_stack.append(current)
+	elif not push:
+		_stack.clear()
+	current = name
+	_dim.visible = name != "main"
+	for k in _pages:
+		_pages[k].visible = k == name
+	var page: Control = _pages[name]
+	if page.has_method("refresh"):
+		page.refresh()
+	if name == "main":
+		_refresh_main()
+	page.modulate.a = 0.0
+	page.create_tween().tween_property(page, "modulate:a", 1.0, 0.18)
+	_focus_first(page)
+	page_changed.emit(name)
+
+
+## Esc / B: go back one page, or close the overlay from the top level.
+func back() -> bool:
+	if current.is_empty():
+		return false
+	if current == "main" or current == "broke":
+		return true
+	AudioManager.play("ui_back")
+	if _stack.is_empty():
+		if current == "pause":
+			resume.emit()
+		else:
+			hide_all()
+			resume.emit()
+		return true
+	var prev: String = _stack.pop_back()
+	var rest := _stack.duplicate()
+	show_page(prev, false)
+	_stack = rest
+	return true
+
+
+func hide_all() -> void:
+	current = ""
+	_stack.clear()
+	_dim.visible = false
+	for k in _pages:
+		_pages[k].visible = false
+	page_changed.emit("")
+
+
+func _focus_first(node: Node) -> void:
+	var b := _find_focusable(node)
+	if b:
+		b.grab_focus.call_deferred()
+
+
+func _find_focusable(node: Node) -> Control:
+	for c in node.get_children():
+		if c is BaseButton and (c as Control).visible and not (c as BaseButton).disabled and (c as Control).focus_mode != Control.FOCUS_NONE:
+			return c
+		var inner := _find_focusable(c)
+		if inner:
+			return inner
+	return null
+
+
+# --- shared frame -----------------------------------------------------------
+
+## A centred panel page. Returns { root, body, footer, title }.
+func frame(title: String, subtitle: String = "", width: float = 760.0, height: float = 0.0) -> Dictionary:
 	var wrap := Control.new()
 	wrap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	wrap.add_child(ThemeFactory.dimmer())
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wrap.add_child(center)
-	var panel := ThemeFactory.panel(center, false)
-	panel.custom_minimum_size = Vector2(560, 520)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	panel.add_child(box)
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 20
-	box.offset_right = -20
-	box.offset_top = 16
-	box.offset_bottom = -16
-	box.add_child(ThemeFactory.label(title, 32, ThemeFactory.GOLD))
-	wrap.set_meta("box", box)
-	return wrap
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(width, height)
+	center.add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	panel.add_child(v)
+	var t := ThemeFactory.label(title, "Heading")
+	v.add_child(t)
+	var s := ThemeFactory.label(subtitle, "Muted")
+	s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	s.custom_minimum_size = Vector2(width - 60.0, 0)
+	s.visible = not subtitle.is_empty()
+	v.add_child(s)
+	v.add_child(ThemeFactory.hsep())
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(body)
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 10)
+	footer.alignment = BoxContainer.ALIGNMENT_END
+	v.add_child(footer)
+	return {"root": wrap, "body": body, "footer": footer, "title": t, "subtitle": s, "panel": panel}
 
 
-func _add_btn(box: VBoxContainer, text: String, cb: Callable) -> void:
-	var b := ThemeFactory.button(text, 360)
+func add_button(box: Container, text: String, cb: Callable, variation: String = "", min_w: int = 200) -> Button:
+	var b := ThemeFactory.button(text, variation, min_w, 48)
 	b.pressed.connect(func() -> void:
-		AudioManager.play("button")
+		AudioManager.play("ui_click")
 		cb.call()
 	)
 	box.add_child(b)
-
-
-func _make_main() -> Control:
-	var s := _screen("SHADOWFETCH BLACKJACK")
-	var box: VBoxContainer = s.get_meta("box")
-	box.add_child(ThemeFactory.label("Fictional chips only. No real-money gambling.", 14, ThemeFactory.MUTED))
-	_add_btn(box, "PLAY", func() -> void: play.emit())
-	_add_btn(box, "SETTINGS", func() -> void: show_page("settings"))
-	_add_btn(box, "STATS", func() -> void: show_page("stats"))
-	_add_btn(box, "HOW TO PLAY", func() -> void: show_page("howto"))
-	_add_btn(box, "QUIT", func() -> void: quit_game.emit())
-	return s
-
-
-func _make_pause() -> Control:
-	var s := _screen("PAUSED")
-	var box: VBoxContainer = s.get_meta("box")
-	_add_btn(box, "RESUME", func() -> void: resume.emit())
-	_add_btn(box, "SETTINGS", func() -> void: show_page("settings"))
-	_add_btn(box, "RESTART SESSION", func() -> void: restart_session.emit())
-	_add_btn(box, "MAIN MENU", func() -> void: main_menu.emit())
-	_add_btn(box, "QUIT", func() -> void: quit_game.emit())
-	return s
-
-
-func _make_settings() -> Control:
-	var s := _screen("SETTINGS")
-	var box: VBoxContainer = s.get_meta("box")
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(480, 320)
-	box.add_child(scroll)
-	var inner := VBoxContainer.new()
-	inner.add_theme_constant_override("separation", 8)
-	scroll.add_child(inner)
-	_res_row(inner)
-	_toggle(inner, "Fullscreen", SettingsStore.fullscreen, func(v): SettingsStore.fullscreen = v, "fullscreen")
-	_toggle(inner, "VSync", SettingsStore.vsync, func(v): SettingsStore.vsync = v, "vsync")
-	_quality_row(inner)
-	_aa_row(inner)
-	_toggle(inner, "Shadows", SettingsStore.shadows, func(v): SettingsStore.shadows = v, "shadows")
-	_slider(inner, "Animation speed", SettingsStore.animation_speed, 0.5, 2.0, func(v): SettingsStore.animation_speed = v, "animation_speed")
-	_slider(inner, "Master", SettingsStore.master_volume, 0.0, 1.0, func(v): SettingsStore.master_volume = v, "master_volume")
-	_slider(inner, "Music", SettingsStore.music_volume, 0.0, 1.0, func(v): SettingsStore.music_volume = v, "music_volume")
-	_slider(inner, "Effects", SettingsStore.fx_volume, 0.0, 1.0, func(v): SettingsStore.fx_volume = v, "fx_volume")
-	_slider(inner, "Ambient", SettingsStore.ambient_volume, 0.0, 1.0, func(v): SettingsStore.ambient_volume = v, "ambient_volume")
-	_toggle(inner, "Mute", SettingsStore.muted, func(v): SettingsStore.muted = v, "muted")
-	inner.add_child(ThemeFactory.label("TABLE RULES · apply on next deal", 14, ThemeFactory.GOLD))
-	_toggle(inner, "Dealer hits soft 17", SettingsStore.dealer_hits_soft_17, func(v): SettingsStore.dealer_hits_soft_17 = v, "dealer_hits_soft_17")
-	_toggle(inner, "Late surrender", SettingsStore.late_surrender, func(v): SettingsStore.late_surrender = v, "late_surrender")
-	var apply := ThemeFactory.button("APPLY & SAVE", 280)
-	apply.pressed.connect(func() -> void:
-		SettingsStore.apply_display()
-		SettingsStore.apply_audio()
-		SettingsStore.save_settings()
-		settings_changed.emit()
-		AudioManager.play("button")
-	)
-	box.add_child(apply)
-	_add_btn(box, "BACK", func() -> void: show_page(settings_return))
-	return s
-
-
-func _res_row(parent: VBoxContainer) -> void:
-	var row := HBoxContainer.new()
-	row.add_child(ThemeFactory.label("Resolution", 16, ThemeFactory.MUTED))
-	var opt := OptionButton.new()
-	opt.custom_minimum_size = Vector2(220, 36)
-	for r in [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]:
-		opt.add_item("%d x %d" % [r.x, r.y])
-		opt.set_item_metadata(opt.item_count - 1, r)
-	opt.item_selected.connect(func(i): SettingsStore.resolution = opt.get_item_metadata(i))
-	row.add_child(opt)
-	parent.add_child(row)
-	_settings_controls["resolution"] = opt
-
-
-func _quality_row(parent: VBoxContainer) -> void:
-	var row := HBoxContainer.new()
-	row.add_child(ThemeFactory.label("Quality", 16, ThemeFactory.MUTED))
-	var opt := OptionButton.new()
-	for q in ["low", "medium", "high", "ultra"]:
-		opt.add_item(q.capitalize())
-		opt.set_item_metadata(opt.item_count - 1, q)
-	opt.item_selected.connect(func(i): SettingsStore.quality = str(opt.get_item_metadata(i)))
-	row.add_child(opt)
-	parent.add_child(row)
-	_settings_controls["quality"] = opt
-
-
-func _aa_row(parent: VBoxContainer) -> void:
-	var row := HBoxContainer.new()
-	row.add_child(ThemeFactory.label("Anti-aliasing", 16, ThemeFactory.MUTED))
-	var opt := OptionButton.new()
-	for pair in [[0, "Off"], [2, "MSAA 2x"], [4, "MSAA 4x"], [8, "MSAA 8x"]]:
-		opt.add_item(pair[1])
-		opt.set_item_metadata(opt.item_count - 1, pair[0])
-	opt.item_selected.connect(func(i): SettingsStore.aa = int(opt.get_item_metadata(i)))
-	row.add_child(opt)
-	parent.add_child(row)
-	_settings_controls["aa"] = opt
-
-
-func _toggle(parent: VBoxContainer, title: String, start: bool, setter: Callable, key: String = "") -> CheckButton:
-	var b := CheckButton.new()
-	b.text = title
-	b.button_pressed = start
-	b.toggled.connect(func(v): setter.call(v))
-	parent.add_child(b)
-	if not key.is_empty():
-		_settings_controls[key] = b
 	return b
 
 
-func _slider(parent: VBoxContainer, title: String, start: float, lo: float, hi: float, setter: Callable, key: String = "") -> void:
-	parent.add_child(ThemeFactory.label(title, 15, ThemeFactory.MUTED))
-	var s := HSlider.new()
-	s.min_value = lo
-	s.max_value = hi
-	s.step = 0.05
-	s.value = start
-	s.custom_minimum_size = Vector2(360, 24)
-	s.value_changed.connect(func(v): setter.call(v))
-	parent.add_child(s)
-	if not key.is_empty():
-		_settings_controls[key] = s
+func back_button(box: Container) -> Button:
+	return add_button(box, "BACK", func() -> void: back(), "", 160)
 
 
-func _sync_settings_controls() -> void:
-	for key in ["fullscreen", "vsync", "shadows", "muted", "dealer_hits_soft_17", "late_surrender"]:
-		if _settings_controls.has(key):
-			_settings_controls[key].button_pressed = bool(SettingsStore.get(key))
-	for key in ["animation_speed", "master_volume", "music_volume", "fx_volume", "ambient_volume"]:
-		if _settings_controls.has(key):
-			_settings_controls[key].value = float(SettingsStore.get(key))
-	_select_metadata(_settings_controls.get("resolution"), SettingsStore.resolution)
-	_select_metadata(_settings_controls.get("quality"), SettingsStore.quality)
-	_select_metadata(_settings_controls.get("aa"), SettingsStore.aa)
+# --- main menu --------------------------------------------------------------
+
+func _make_main() -> Control:
+	var wrap := Control.new()
+	wrap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shade := TextureRect.new()
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0, 0, 0, 0.92))
+	grad.set_color(1, Color(0, 0, 0, 0.0))
+	grad.add_point(0.55, Color(0, 0, 0, 0.7))
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.width = 256
+	gt.height = 4
+	shade.texture = gt
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	shade.offset_right = 1100
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(shade)
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	col.offset_left = 120
+	col.offset_right = 760
+	col.offset_top = 110
+	col.offset_bottom = -70
+	col.add_theme_constant_override("separation", 4)
+	wrap.add_child(col)
+	col.add_child(ThemeFactory.label("SHADOWFETCH", "Caps"))
+	var title := ThemeFactory.label("Blackjack", "Title")
+	title.add_theme_font_size_override("font_size", 104)
+	title.add_theme_color_override("font_color", ThemeFactory.CREAM)
+	col.add_child(title)
+	var tag := ThemeFactory.label("A private card room  ·  fictional chips only", "Muted")
+	tag.add_theme_font_size_override("font_size", 19)
+	col.add_child(tag)
+	col.add_child(ThemeFactory.spacer(34))
+	_play_button = _menu_item(col, "Play", func() -> void: play.emit())
+	_menu_item(col, "Table Rules", func() -> void: show_page("rules"))
+	_menu_item(col, "Strategy Chart", func() -> void: show_page("chart"))
+	_menu_item(col, "Statistics", func() -> void: show_page("stats"))
+	_menu_item(col, "Hand History", func() -> void: show_page("history"))
+	_menu_item(col, "Achievements", func() -> void: show_page("achievements"))
+	_menu_item(col, "Settings", func() -> void: show_page("settings"))
+	_menu_item(col, "How to Play", func() -> void: show_page("howto"))
+	_menu_item(col, "Quit", func() -> void: quit_game.emit())
+	col.add_child(ThemeFactory.expander())
+	_menu_bankroll = ThemeFactory.label("", "Muted")
+	col.add_child(_menu_bankroll)
+	var ver := ThemeFactory.label("Version %s  ·  Play money only — not a gambling service" % ProjectSettings.get_setting("application/config/version", "3"), "Muted")
+	ver.add_theme_font_size_override("font_size", 13)
+	ver.add_theme_color_override("font_color", ThemeFactory.DIM)
+	col.add_child(ver)
+	return wrap
 
 
-func _select_metadata(control: OptionButton, value: Variant) -> void:
-	if control == null:
-		return
-	for i in control.item_count:
-		if control.get_item_metadata(i) == value:
-			control.select(i)
-			return
-
-
-func _make_stats() -> Control:
-	var s := _screen("STATISTICS")
-	var box: VBoxContainer = s.get_meta("box")
-	var body := ThemeFactory.label("", 18, ThemeFactory.CREAM)
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	s.set_meta("stats_body", body)
-	box.add_child(body)
-	_add_btn(box, "RESET ALL STATS", func() -> void:
-		StatsStore.reset_all()
-		_refresh_stats()
+func _menu_item(col: VBoxContainer, text: String, cb: Callable) -> Button:
+	var b := ThemeFactory.button(text, "GhostButton", 360, 52)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	b.pressed.connect(func() -> void:
+		AudioManager.play("ui_click")
+		cb.call()
 	)
-	_add_btn(box, "BACK", func() -> void: show_page("main"))
-	return s
+	col.add_child(b)
+	return b
 
 
-func _refresh_stats() -> void:
-	var s: Control = _pages["stats"]
-	var body: Label = s.get_meta("stats_body")
-	body.text = "\n".join([
-		"Bankroll   %s" % BJMoney.format_cents(StatsStore.bankroll_cents),
-		"Lifetime P/L   %s" % BJMoney.format_signed(StatsStore.lifetime_profit_cents),
-		"Session P/L   %s" % BJMoney.format_signed(StatsStore.session_profit_cents),
-		"Hands   %d" % StatsStore.hands,
-		"Wins / Losses / Pushes   %d / %d / %d" % [StatsStore.wins, StatsStore.losses, StatsStore.pushes],
-		"Blackjacks   %d" % StatsStore.blackjacks,
-		"Largest win   %s" % BJMoney.format_cents(StatsStore.largest_win_cents),
-		"Win rate   %.1f%%" % StatsStore.win_percent(),
-		"Last bet   %s" % BJMoney.format_cents(StatsStore.last_bet_cents),
-	])
+func _refresh_main() -> void:
+	if engine:
+		var in_round: bool = engine.phase != 0
+		_play_button.text = "Continue" if in_round or engine.hands_played > 0 else "Play"
+		_menu_bankroll.text = "Bankroll  %s   ·   %d achievements of %d" % [BJMoney.format_cents(engine.bankroll_cents), Achievements.unlocked_count(), Achievements.total()]
 
+
+# --- pause ------------------------------------------------------------------
+
+func _make_pause() -> Control:
+	var f := frame("Paused", "The table waits for you.", 520)
+	var body: VBoxContainer = f["body"]
+	add_button(body, "RESUME", func() -> void: resume.emit(), "PrimaryButton")
+	add_button(body, "TABLE RULES", func() -> void: show_page("rules"))
+	add_button(body, "STRATEGY CHART", func() -> void: show_page("chart"))
+	add_button(body, "STATISTICS", func() -> void: show_page("stats"))
+	add_button(body, "HAND HISTORY", func() -> void: show_page("history"))
+	add_button(body, "SETTINGS", func() -> void: show_page("settings"))
+	add_button(body, "HOW TO PLAY", func() -> void: show_page("howto"))
+	body.add_child(ThemeFactory.hsep())
+	add_button(body, "RESTART SESSION", func() -> void:
+		confirm("Restart session?", "Your bankroll returns to $10,000 in fictional chips. Lifetime statistics and achievements are kept.", "RESTART", func() -> void: restart_session.emit())
+	)
+	add_button(body, "MAIN MENU", func() -> void: main_menu.emit())
+	add_button(body, "QUIT TO DESKTOP", func() -> void: quit_game.emit(), "DangerButton")
+	return f["root"]
+
+
+# --- dialogs ----------------------------------------------------------------
+
+func confirm(title: String, text: String, ok_label: String, on_ok: Callable) -> void:
+	if _pages.has("confirm"):
+		(_pages["confirm"] as Node).queue_free()
+		_pages.erase("confirm")
+	var f := frame(title, "", 560)
+	var l := ThemeFactory.label(text, "Body")
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(500, 0)
+	(f["body"] as VBoxContainer).add_child(l)
+	var footer: HBoxContainer = f["footer"]
+	add_button(footer, "CANCEL", func() -> void: back(), "", 150)
+	add_button(footer, ok_label, func() -> void:
+		back()
+		on_ok.call()
+	, "DangerButton", 170)
+	_add_page("confirm", f["root"])
+	show_page("confirm")
+
+
+func _make_broke() -> Control:
+	var f := frame("Out of chips", "", 560)
+	var l := ThemeFactory.label("The house extends a fresh $10,000 marker in fictional chips. Nothing real was ever at stake — take a breath, then play on.", "Body")
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(500, 0)
+	(f["body"] as VBoxContainer).add_child(l)
+	var footer: HBoxContainer = f["footer"]
+	add_button(footer, "MAIN MENU", func() -> void: main_menu.emit(), "", 160)
+	add_button(footer, "REBUY $10,000", func() -> void: rebuy.emit(), "PrimaryButton", 210)
+	return f["root"]
+
+
+# --- how to play ------------------------------------------------------------
 
 func _make_howto() -> Control:
-	var s := _screen("HOW TO PLAY")
-	var box: VBoxContainer = s.get_meta("box")
+	var f := frame("How to Play", "", 980, 760)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(scroll)
-	var lab := ThemeFactory.label(_howto_text(), 15, ThemeFactory.CREAM)
-	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lab.custom_minimum_size = Vector2(500, 0)
-	scroll.add_child(lab)
-	_add_btn(box, "BACK", func() -> void: show_page("main"))
-	return s
-
-
-func _make_tutorial() -> Control:
-	var s := _screen("WELCOME TO THE TABLE")
-	var box: VBoxContainer = s.get_meta("box")
-	var lab := ThemeFactory.label(_tutorial_text(), 16, ThemeFactory.CREAM)
-	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lab.custom_minimum_size = Vector2(500, 0)
-	box.add_child(lab)
-	_add_btn(box, "SIT DOWN", func() -> void:
-		SettingsStore.seen_tutorial = true
-		SettingsStore.save_settings()
-		hide_all()
-		play.emit()
-	)
-	return s
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	(f["body"] as VBoxContainer).add_child(scroll)
+	var rt := RichTextLabel.new()
+	rt.bbcode_enabled = true
+	rt.fit_content = true
+	rt.scroll_active = false
+	rt.custom_minimum_size = Vector2(900, 0)
+	rt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rt.text = _howto_text()
+	scroll.add_child(rt)
+	back_button(f["footer"])
+	return f["root"]
 
 
 func _howto_text() -> String:
-	return """Goal
-Beat the dealer without going over 21. Fictional chips only.
-
-Card values
-Aces count as 1 or 11. Face cards are 10. All others are their pip value.
-
-The deal
-Place a wager, then Deal. You and the dealer each receive two cards. The dealer keeps one card hidden.
-
-Your actions
-Hit — take another card.
-Stand — keep your total.
-Double — double your bet, take exactly one card, then stand.
-Split — if your first two cards share a rank, play them as two hands (up to four). Doubling after a split is allowed. Split aces receive one card each.
-Surrender — on your first two cards, forfeit half your wager when late surrender is enabled.
-
-Blackjack
-An ace and a ten-value card on the first two cards pays 3 to 2, unless the dealer also has blackjack (push).
-
-Insurance
-If the dealer shows an ace you may insure for half your bet. Insurance pays 2 to 1 if the dealer has blackjack.
-
-Dealer
-The default table stands on every 17, including soft 17 (ace + 6). You can enable H17 in Table Rules.
-
-Keys
-Space Deal   H Hit   S Stand   D Double   P Split   U Surrender   R Repeat   Esc Menu
-"""
-
-
-func _tutorial_text() -> String:
-	return """Click chips (or the tray) to build a bet, then press DEAL.
-
-Try to reach 21 without going over. The dealer must stand on all 17s.
-
-A natural blackjack pays 3 to 2. This table uses fictional money only — there is no cash-out and no real wagering.
-
-Open MENU anytime for settings, stats, and a full rules guide."""
+	var g := "#dcb86b"
+	var h := "[font_size=24][color=%s]%s[/color][/font_size]\n"
+	var s := ""
+	s += h % [g, "The goal"]
+	s += "Finish closer to 21 than the dealer without going over. Aces count 1 or 11, face cards 10, everything else its number. All chips are fictional — there is no cash-out.\n\n"
+	s += h % [g, "Betting"]
+	s += "Pick a chip in the rack (or press [b]1–6[/b]) to add it to your main bet, or click a betting circle on the felt to place the selected chip there. Right-click a circle to take the last chip back. [b]Z[/b] undoes, [b]X[/b] clears, [b]R[/b] repeats your last bet and deals. Table limits are $1–$10,000 on the main bet and up to $1,000 on each side bet.\n\n"
+	s += h % [g, "Your options"]
+	s += "[b]Hit (H)[/b] take a card.   [b]Stand (S)[/b] keep your total.   [b]Double (D)[/b] double the bet, take exactly one card.   [b]Split (P)[/b] play a pair as two hands.   [b]Surrender (U)[/b] give up half the bet on your first two cards (when late surrender is on).\n"
+	s += "Twenty-one stands automatically. Split aces get one card each (and can be split again only when the table allows re-splitting aces). A 21 made after a split is not a blackjack.\n\n"
+	s += h % [g, "Payouts"]
+	s += "Blackjack pays 3 to 2 (6 to 5 on tables that say so). Other wins pay even money. Ties push. The dealer checks for blackjack under an ace or ten before you act, so you only lose your original bet to a dealer blackjack.\n\n"
+	s += h % [g, "Insurance and even money"]
+	s += "When the dealer shows an ace you may insure for half your bet; it pays 2 to 1 if the dealer has blackjack. Holding a blackjack yourself, you are offered [b]even money[/b] instead: a guaranteed 1-to-1 win. Basic strategy declines both.\n\n"
+	s += h % [g, "Side bets"]
+	s += "[b]Perfect Pairs[/b] (your first two cards): perfect pair 25:1, coloured pair 12:1, mixed pair 6:1.\n"
+	s += "[b]21+3[/b] (your two cards + the dealer's up-card as a poker hand): suited trips 100:1, straight flush 40:1, three of a kind 30:1, straight 10:1, flush 5:1. Side bets settle straight after the deal.\n\n"
+	s += h % [g, "Table rules"]
+	s += "Open [b]Table Rules[/b] to choose decks (1–8), dealer stands or hits soft 17, 3:2 or 6:5, double after split, re-split aces, split limit, late surrender, shoe penetration and side bets. The felt, the strategy chart and the house-edge estimate all follow your choices. Changes take effect on the next deal.\n\n"
+	s += h % [g, "Strategy coach and counting trainer"]
+	s += "[b]HINT (T)[/b] shows the basic-strategy play for the current rules. In [b]Settings → Gameplay[/b] the Coach can grade every decision; your accuracy is tracked in Statistics either way. Turn on the [b]count trainer[/b] to see the Hi-Lo running count and true count of every card you have seen since the shuffle.\n\n"
+	s += h % [g, "Controls"]
+	s += "[table=3][cell][b]Action[/b]   [/cell][cell][b]Keyboard[/b]   [/cell][cell][b]Gamepad[/b][/cell]"
+	var rows := [
+		["Deal / rebet & deal", "Space / R", "Y / X"], ["Add selected chip", "1–6 · click", "A"], ["Choose chip", "1–6", "LB / RB"],
+		["Undo / clear", "Z / X", "B / Back"], ["Hit / stand", "H / S", "A / B"], ["Double / split", "D / P", "X / Y"],
+		["Surrender / hint", "U / T", "LB / RB"], ["Insurance yes / no", "Y / N", "A / B"], ["Camera view", "C", "Back (in play)"],
+		["Pause menu", "Esc", "Start"],
+	]
+	for r in rows:
+		s += "[cell]%s   [/cell][cell]%s   [/cell][cell]%s[/cell]" % r
+	s += "[/table]\n\n"
+	s += h % [g, "Play responsibly"]
+	s += "This is a video game with play money. It does not offer real-money gambling. If gambling stops being fun for you or someone you know, local support services can help."
+	return s

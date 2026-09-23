@@ -27,4 +27,3 @@ tools/godot*
 user://
 app_userdata/
 *.uid
-docs/screenshots/*.import

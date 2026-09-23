@@ -9,8 +9,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Shadowfetch Blackjack"
-config/description="A premium standalone 3D blackjack table for Linux. Fictional currency only."
-config/version="2.0.0"
+config/description="A flagship 3D blackjack table for Linux. Fictional currency only."
+config/version="3.0.0"
 run/main_scene="res://scenes/boot.tscn"
 config/auto_accept_quit=true
 config/features=PackedStringArray("4.7", "Forward Plus")
@@ -25,6 +25,7 @@ buses/default_bus_layout="res://default_bus_layout.tres"
 SettingsStore="*res://scripts/save/settings_store.gd"
 StatsStore="*res://scripts/save/stats_store.gd"
 AudioManager="*res://scripts/audio/audio_manager.gd"
+Achievements="*res://scripts/meta/achievements.gd"
 
 [debug]
 
@@ -44,6 +45,10 @@ window/size/mode=0
 [gui]
 
 common/snap_controls_to_pixels=true
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=false
 
 [physics]
 

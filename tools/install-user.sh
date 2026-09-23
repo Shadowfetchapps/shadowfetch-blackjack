@@ -29,7 +29,7 @@ Type=Application
 Version=1.0
 Name=Shadowfetch Blackjack
 GenericName=Blackjack
-Comment=Premium 3D blackjack for Linux. Fictional currency only.
+Comment=Flagship 3D blackjack for Linux. Fictional chips only.
 Exec=${BINDIR}/shadowfetch-blackjack
 TryExec=${BINDIR}/shadowfetch-blackjack
 Icon=${ICON_NAME}
@@ -38,7 +38,7 @@ Categories=Game;CardGame;
 Keywords=blackjack;cards;casino;shadowfetch;
 StartupNotify=true
 StartupWMClass=Shadowfetch Blackjack
-X-AppVersion=2.0.0
+X-AppVersion=3.0.0
 EOF
 if command -v update-desktop-database >/dev/null; then
   update-desktop-database "$PREFIX/applications" || true

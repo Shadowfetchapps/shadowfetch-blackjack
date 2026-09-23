@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:-2.0.0}"
+VERSION="${1:-$(grep -Po "(?<=config/version=\")[^\"]+" "$ROOT/project.godot")}"
 NAME="shadowfetch-blackjack-${VERSION}-linux-x86_64"
 STAGE="$ROOT/export/package/$NAME"
 ARCHIVE="$ROOT/export/$NAME.tar.gz"
@@ -18,6 +18,6 @@ cp -a "$ROOT/data" "$STAGE/"
 install -m 0644 "$ROOT/icon.svg" "$ROOT/LICENSE" "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$STAGE/"
 
 tar -C "$ROOT/export/package" -czf "$ARCHIVE" "$NAME"
-sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+(cd "$ROOT/export" && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256")
 echo "$ARCHIVE"
 echo "$ARCHIVE.sha256"

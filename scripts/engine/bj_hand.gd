@@ -1,5 +1,6 @@
 class_name BJHand
 extends RefCounted
+## A player or dealer hand. Totals count at most one ace as 11.
 
 const BJCard = preload("res://scripts/engine/bj_card.gd")
 
@@ -10,9 +11,12 @@ var from_split: bool = false
 var from_split_aces: bool = false
 var stood: bool = false
 var surrendered: bool = false
+var even_money: bool = false
 var settled: bool = false
 var outcome: String = ""
 var payout_cents: int = 0
+## Player decisions in order: H hit, S stand, D double, P split, R surrender.
+var actions: String = ""
 
 
 func add(card: BJCard) -> void:
@@ -39,8 +43,7 @@ func ace_count() -> int:
 
 
 func is_soft() -> bool:
-	var hard := hard_total()
-	return ace_count() > 0 and hard + 10 <= 21
+	return ace_count() > 0 and hard_total() + 10 <= 21
 
 
 func best_total() -> int:
@@ -67,7 +70,21 @@ func is_pair() -> bool:
 
 
 func is_finished() -> bool:
-	return stood or surrendered or is_bust() or settled or (from_split_aces and cards.size() >= 2)
+	return stood or surrendered or is_bust() or settled
+
+
+## Display text such as "16", "Soft 18", "Blackjack" or "Bust 24".
+func total_text() -> String:
+	if cards.is_empty():
+		return ""
+	if is_blackjack():
+		return "Blackjack"
+	var t := best_total()
+	if t > 21:
+		return "Bust %d" % t
+	if is_soft() and t < 21:
+		return "Soft %d" % t
+	return str(t)
 
 
 func upcard() -> BJCard:
@@ -89,6 +106,13 @@ func ids() -> PackedStringArray:
 	return out
 
 
+func face_keys() -> PackedStringArray:
+	var out := PackedStringArray()
+	for c in cards:
+		out.append(c.face_key())
+	return out
+
+
 func clear() -> void:
 	cards.clear()
 	bet_cents = 0
@@ -97,6 +121,8 @@ func clear() -> void:
 	from_split_aces = false
 	stood = false
 	surrendered = false
+	even_money = false
 	settled = false
 	outcome = ""
 	payout_cents = 0
+	actions = ""
